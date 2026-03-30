@@ -1,0 +1,7 @@
+https://github.com/pallets/click.git
+https://github.com/sdispater/tomlkit.git
+https://github.com/pallets/jinja.git
+https://github.com/psf/requests.git
+https://github.com/encode/starlette.git
+https://github.com/pyca/cryptography.git
+https://github.com/rasbt/mlxtend.git
