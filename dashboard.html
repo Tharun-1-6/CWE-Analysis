@@ -1,0 +1,1026 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI/ML Vulnerability Analysis Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&family=Instrument+Sans:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0a0d12;
+    --bg2: #0f1319;
+    --bg3: #151b24;
+    --surface: #1a2230;
+    --surface2: #1f2a3a;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8edf5;
+    --muted: #7a8fa8;
+    --accent: #4af0b6;
+    --accent2: #3dd8ff;
+    --danger: #ff4d6d;
+    --warn: #ffc94a;
+    --info: #6c8fff;
+    --low: #52d68a;
+    --font-display: 'Syne', sans-serif;
+    --font-body: 'Instrument Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── SCANLINE TEXTURE ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .page { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 32px 80px; }
+
+  /* ── HERO HEADER ── */
+  .hero {
+    padding: 60px 0 48px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 48px;
+  }
+  .hero-eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-eyebrow::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--accent);
+  }
+  .hero h1 {
+    font-family: var(--font-display);
+    font-size: clamp(32px, 4vw, 52px);
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    margin-bottom: 16px;
+    max-width: 720px;
+  }
+  .hero h1 span { color: var(--accent); }
+  .hero-sub {
+    font-size: 15px;
+    color: var(--muted);
+    max-width: 560px;
+    line-height: 1.7;
+  }
+  .hero-meta {
+    margin-top: 24px;
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .hero-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── SECTION TITLES ── */
+  .section-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── METRIC CARDS ── */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 48px;
+  }
+  .metric {
+    background: var(--bg2);
+    padding: 28px 24px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.2s;
+  }
+  .metric:hover { background: var(--bg3); }
+  .metric::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .metric.accent::before { background: var(--accent); }
+  .metric.danger::before { background: var(--danger); }
+  .metric.warn::before { background: var(--warn); }
+  .metric.info::before { background: var(--info); }
+  .metric.low::before { background: var(--low); }
+
+  .metric-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .metric-value {
+    font-family: var(--font-display);
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--text);
+  }
+  .metric-value.accent { color: var(--accent); }
+  .metric-value.danger { color: var(--danger); }
+  .metric-value.warn { color: var(--warn); }
+  .metric-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* ── CHART GRID ── */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .chart-grid.wide { grid-template-columns: 2fr 1fr; }
+  .chart-grid.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    position: relative;
+  }
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .card-sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  /* ── SEVERITY BAR ── */
+  .sev-bar { margin-bottom: 14px; }
+  .sev-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .sev-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 64px;
+    flex-shrink: 0;
+  }
+  .sev-track {
+    flex: 1;
+    height: 6px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .sev-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 1s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .sev-count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 72px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .sev-pct {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── CWE TABLE ── */
+  .cwe-list { display: flex; flex-direction: column; gap: 0; }
+  .cwe-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 80px 56px;
+    gap: 12px;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cwe-row:last-child { border-bottom: none; }
+  .cwe-id {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent2);
+    font-weight: 500;
+  }
+  .cwe-name {
+    font-size: 12px;
+    color: var(--text);
+    line-height: 1.4;
+  }
+  .cwe-bar-wrap {
+    display: none;
+  }
+  .cwe-count {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted);
+    text-align: right;
+  }
+  .cwe-pct {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-align: right;
+  }
+  .rank-badge {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.05);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+
+  /* ── INSIGHTS PANEL ── */
+  .insights { margin-bottom: 20px; }
+  .insight-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .insight-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+  }
+  .insight-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    font-size: 15px;
+  }
+  .insight-icon.red { background: rgba(255,77,109,0.15); }
+  .insight-icon.teal { background: rgba(74,240,182,0.12); }
+  .insight-icon.amber { background: rgba(255,201,74,0.12); }
+  .insight-icon.blue { background: rgba(108,143,255,0.12); }
+  .insight-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .insight-body {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .insight-body code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(74,240,182,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ── AI ANALYSIS ── */
+  .analysis-section { margin-top: 48px; }
+  .analysis-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .analysis-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .analysis-header:hover { background: rgba(255,255,255,0.02); }
+  .analysis-num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--muted);
+    width: 20px;
+  }
+  .analysis-label {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    flex: 1;
+  }
+  .analysis-toggle {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--muted);
+    transition: transform 0.3s;
+  }
+  .analysis-toggle.open { transform: rotate(90deg); }
+  .analysis-body {
+    padding: 0 24px;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1), padding 0.3s;
+  }
+  .analysis-body.open {
+    padding: 20px 24px;
+    max-height: 800px;
+  }
+  .analysis-body p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.75;
+    margin-bottom: 10px;
+  }
+  .analysis-body p:last-child { margin-bottom: 0; }
+  .analysis-body strong { color: var(--text); font-weight: 500; }
+  .analysis-body code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(74,240,182,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ── CHECKLIST ── */
+  .checklist { display: flex; flex-direction: column; gap: 10px; }
+  .check-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--bg3);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .check-box {
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    flex-shrink: 0;
+    margin-top: 1px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+  }
+  .check-box:hover { border-color: var(--accent); }
+  .check-box.checked { background: var(--accent); border-color: var(--accent); }
+  .check-box.checked::after { content: '✓'; font-size: 10px; color: #000; font-weight: 700; }
+  .check-label {
+    font-size: 13px;
+    color: var(--text);
+    line-height: 1.5;
+  }
+  .check-label code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(74,240,182,0.08);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ── LEGEND PILL ── */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+  .legend-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  /* ── FOOTER ── */
+  .footer {
+    margin-top: 64px;
+    padding-top: 32px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: gap;
+  }
+  .footer-left {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .footer-right {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  @media (max-width: 768px) {
+    .page { padding: 0 16px 60px; }
+    .chart-grid, .chart-grid.wide, .chart-grid.triple { grid-template-columns: 1fr; }
+    .insight-grid { grid-template-columns: 1fr; }
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .cwe-row { grid-template-columns: 72px 1fr 64px 44px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ── HERO ── -->
+  <div class="hero">
+    <h1>The Vulnerability Dashboard</h1>
+    <p class="hero-sub">A large-scale static analysis of 2,439 AI/ML GitHub repositories using Semgrep and Bandit, revealing systemic security weaknesses across the ecosystem.</p>
+  </div>
+
+  <!-- ── METRICS ── -->
+  <div class="section-title">Overview</div>
+  <div class="metrics">
+    <div class="metric accent">
+      <div class="metric-label">Repositories</div>
+      <div class="metric-value accent" id="cnt-repos">0</div>
+      <div class="metric-sub">AI/ML GitHub repos scanned</div>
+    </div>
+    <div class="metric danger">
+      <div class="metric-label">Total Findings</div>
+      <div class="metric-value danger" id="cnt-findings">0</div>
+      <div class="metric-sub">Security vulnerabilities detected</div>
+    </div>
+    <div class="metric warn">
+      <div class="metric-label">High Severity</div>
+      <div class="metric-value warn">1,909</div>
+      <div class="metric-sub">Critical exploitable issues (1.1%)</div>
+    </div>
+    <div class="metric info">
+      <div class="metric-label">CWE-502 Cases</div>
+      <div class="metric-value" style="color: var(--info);">12,222</div>
+      <div class="metric-sub">Deserialization via pickle (7.2%)</div>
+    </div>
+    <div class="metric low">
+      <div class="metric-label">Avg / Repo</div>
+      <div class="metric-value" style="color: var(--low);">69.4</div>
+      <div class="metric-sub">Findings per repository</div>
+    </div>
+  </div>
+
+  <!-- ── TOOL + SEVERITY ── -->
+  <div class="chart-grid wide">
+
+    <div class="card">
+      <div class="card-title">Severity Distribution</div>
+      <div class="card-sub">All 169,302 findings across both tools</div>
+      <div class="sev-bar">
+        <div class="sev-row">
+          <span class="sev-label">LOW</span>
+          <div class="sev-track"><div class="sev-fill" style="width:0%;background:#52d68a" data-w="73.7"></div></div>
+          <span class="sev-count">124,842</span>
+          <span class="sev-pct" style="color:#52d68a">73.7%</span>
+        </div>
+        <div class="sev-row">
+          <span class="sev-label">WARNING</span>
+          <div class="sev-track"><div class="sev-fill" style="width:0%;background:#ffc94a" data-w="13.0"></div></div>
+          <span class="sev-count">21,953</span>
+          <span class="sev-pct" style="color:#ffc94a">13.0%</span>
+        </div>
+        <div class="sev-row">
+          <span class="sev-label">MEDIUM</span>
+          <div class="sev-track"><div class="sev-fill" style="width:0%;background:#6c8fff" data-w="7.8"></div></div>
+          <span class="sev-count">13,169</span>
+          <span class="sev-pct" style="color:#6c8fff">7.8%</span>
+        </div>
+        <div class="sev-row">
+          <span class="sev-label">ERROR</span>
+          <div class="sev-track"><div class="sev-fill" style="width:0%;background:#ff9f56" data-w="4.3"></div></div>
+          <span class="sev-count">7,344</span>
+          <span class="sev-pct" style="color:#ff9f56">4.3%</span>
+        </div>
+        <div class="sev-row">
+          <span class="sev-label">HIGH</span>
+          <div class="sev-track"><div class="sev-fill" style="width:0%;background:#ff4d6d" data-w="1.1"></div></div>
+          <span class="sev-count">1,909</span>
+          <span class="sev-pct" style="color:#ff4d6d">1.1%</span>
+        </div>
+        <div class="sev-row">
+          <span class="sev-label">INFO</span>
+          <div class="sev-track"><div class="sev-fill" style="width:0%;background:#7a8fa8" data-w="0.07"></div></div>
+          <span class="sev-count">115</span>
+          <span class="sev-pct" style="color:#7a8fa8">0.07%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Tool Distribution</div>
+      <div class="card-sub">Findings by scanner</div>
+      <div class="legend">
+        <span class="legend-item"><span class="legend-dot" style="background:#ff4d6d"></span>Bandit 82.6%</span>
+        <span class="legend-item"><span class="legend-dot" style="background:#4af0b6"></span>Semgrep 17.4%</span>
+      </div>
+      <div style="position:relative;height:200px;">
+        <canvas id="toolChart" role="img" aria-label="Donut chart showing Bandit 82.6% and Semgrep 17.4% of findings">Bandit: 139,840 findings (82.6%). Semgrep: 29,462 findings (17.4%).</canvas>
+      </div>
+      <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(255,77,109,0.08);border-radius:6px;border:1px solid rgba(255,77,109,0.2);">
+          <span style="font-family:var(--font-mono);font-size:11px;color:#ff4d6d">Bandit</span>
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--text)">139,840</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:rgba(74,240,182,0.08);border-radius:6px;border:1px solid rgba(74,240,182,0.15);">
+          <span style="font-family:var(--font-mono);font-size:11px;color:#4af0b6">Semgrep</span>
+          <span style="font-family:var(--font-mono);font-size:12px;color:var(--text)">29,462</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── CWE TABLE + DONUT ── -->
+  <div class="chart-grid wide" style="margin-bottom:20px;">
+
+    <div class="card">
+      <div class="card-title">Top 10 CWE Categories</div>
+      <div class="card-sub">Ranked by occurrence count</div>
+      <div class="cwe-list">
+        <div class="cwe-row" style="border-bottom:1px solid var(--border2);padding-bottom:8px;margin-bottom:2px;">
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);">CWE ID</span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);">Description</span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:right;">Count</span>
+          <span style="font-family:var(--font-mono);font-size:10px;color:var(--muted);text-align:right;">%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-502</span><span class="cwe-name">Deserialization of Untrusted Data</span><span class="cwe-count">12,222</span><span class="cwe-pct" style="color:#ff4d6d">7.2%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-676</span><span class="cwe-name">Use of Potentially Dangerous Function</span><span class="cwe-count">2,703</span><span class="cwe-pct" style="color:#ff9f56">1.6%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-319</span><span class="cwe-name">Cleartext Transmission of Sensitive Info</span><span class="cwe-count">2,566</span><span class="cwe-pct" style="color:#ffc94a">1.5%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-353</span><span class="cwe-name">Missing Support for Integrity Check</span><span class="cwe-count">1,950</span><span class="cwe-pct" style="color:#ffc94a">1.1%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-95</span><span class="cwe-name">Eval Injection</span><span class="cwe-count">1,632</span><span class="cwe-pct" style="color:#6c8fff">1.0%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-20</span><span class="cwe-name">Improper Input Validation</span><span class="cwe-count">730</span><span class="cwe-pct" style="color:#6c8fff">0.4%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-706</span><span class="cwe-name">Incorrectly-Resolved Name or Reference</span><span class="cwe-count">676</span><span class="cwe-pct" style="color:#3dd8ff">0.4%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-78</span><span class="cwe-name">OS Command Injection</span><span class="cwe-count">419</span><span class="cwe-pct" style="color:#3dd8ff">0.25%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-939</span><span class="cwe-name">Improper Authorization in URL Handler</span><span class="cwe-count">270</span><span class="cwe-pct" style="color:#4af0b6">0.16%</span>
+        </div>
+        <div class="cwe-row">
+          <span class="cwe-id">CWE-96</span><span class="cwe-name">Static Code Injection</span><span class="cwe-count">232</span><span class="cwe-pct" style="color:#4af0b6">0.14%</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;gap:20px;">
+      <div>
+        <div class="card-title">CWE Frequency</div>
+        <div class="card-sub">Top 10 by occurrence</div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot" style="background:#ff4d6d"></span>Critical</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#6c8fff"></span>Moderate</span>
+          <span class="legend-item"><span class="legend-dot" style="background:#4af0b6"></span>Low</span>
+        </div>
+        <div style="position:relative;height:280px;">
+          <canvas id="cweChart" role="img" aria-label="Horizontal bar chart of top 10 CWEs by occurrence count">CWE-502 leads with 12,222 occurrences, followed by CWE-676 at 2,703.</canvas>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── SEVERITY DONUT + TREND ── -->
+  <div class="chart-grid triple" style="margin-bottom:48px;">
+    <div class="card">
+      <div class="card-title">Severity Breakdown</div>
+      <div class="card-sub">Proportional view</div>
+      <div style="position:relative;height:200px;">
+        <canvas id="sevChart" role="img" aria-label="Donut chart of severity levels. LOW 73.7%, WARNING 13%, MEDIUM 7.8%, ERROR 4.3%, HIGH 1.1%, INFO 0.07%">LOW: 73.7%, WARNING: 13%, MEDIUM: 7.8%, ERROR: 4.3%, HIGH: 1.1%, INFO: 0.07%.</canvas>
+      </div>
+    </div>
+    <div class="card" style="grid-column: span 2;">
+      <div class="card-title">Actionable Findings by Category</div>
+      <div class="card-sub">Findings at MEDIUM severity and above (excl. LOW/INFO)</div>
+      <div style="position:relative;height:200px;">
+        <canvas id="actionChart" role="img" aria-label="Bar chart of actionable findings: WARNING 21953, MEDIUM 13169, ERROR 7344, HIGH 1909">WARNING: 21,953 · MEDIUM: 13,169 · ERROR: 7,344 · HIGH: 1,909.</canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── KEY INSIGHTS ── -->
+  <div class="section-title">Key Insights</div>
+  <div class="insights">
+    <div class="insight-grid">
+      <div class="insight-card">
+        <div class="insight-icon red">⚠</div>
+        <div class="insight-title">The Pickle Crisis</div>
+        <div class="insight-body">CWE-502 accounts for 7.2% of all findings — 12,222 occurrences of <code>pickle.load()</code> enabling arbitrary code execution. Python's pickle module is the default AI/ML serialization format, making this a systemic supply-chain risk rather than an isolated bad practice.</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon amber">⚡</div>
+        <div class="insight-title">Dynamic Execution Patterns</div>
+        <div class="insight-body">CWE-95 (eval injection, 1,632 cases) combined with CWE-676 (dangerous functions, 2,703) reveal widespread use of <code>eval()</code> and <code>exec()</code> for dynamic hyperparameter and architecture specification — a research-driven pattern that creates real RCE exposure in production.</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon blue">⬡</div>
+        <div class="insight-title">Integrity & Transmission Gaps</div>
+        <div class="insight-body">CWE-319 (cleartext, 2,566) and CWE-353 (missing integrity check, 1,950) together expose model weight downloads to MitM attacks. Researchers routinely fetch multi-GB model files over HTTP without SHA-256 verification — enabling silent backdoor injection.</div>
+      </div>
+      <div class="insight-card">
+        <div class="insight-icon teal">⟳</div>
+        <div class="insight-title">Security Lag Phenomenon</div>
+        <div class="insight-body">An average of 69.4 findings per repository and 1,909 HIGH severity findings across 2,439 repos indicates a "notebook-to-production" tech debt problem. Research-grade code written for speed enters production carrying patterns like <code>shell=True</code> and hardcoded secrets.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── AI ANALYSIS ── -->
+  <div class="analysis-section">
+    <div class="section-title">AI-Generated Analysis (Gemini)</div>
+
+    <div class="analysis-block">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <span class="analysis-num">01</span>
+        <span class="analysis-label">Key Observations</span>
+        <span class="analysis-toggle">›</span>
+      </div>
+      <div class="analysis-body">
+        <p><strong>Tooling Bias and Noise:</strong> Bandit accounts for 82.6% of findings. Given Bandit's high sensitivity to low risks (e.g. assert statements, standard library choices), this explains the 73.7% LOW severity distribution. However, the 1.1% HIGH severity findings (~1,909 instances) represent critical, exploitable flaws across 2,439 repositories.</p>
+        <p><strong>The "Pickle" Crisis:</strong> CWE-502 is the most significant high-impact finding at 7.2%. In AI/ML, this almost exclusively points to use of the <code>pickle</code> module for model serialization and data persistence — a pattern so common it constitutes a systemic risk.</p>
+        <p><strong>Dynamic Execution Prevalence:</strong> The combination of CWE-95 (Eval Injection) and CWE-676 (Dangerous Functions) suggests widespread use of dynamic code execution to handle configurations, hyperparameters, and model architectures.</p>
+        <p><strong>Density:</strong> An average of 69 findings per repository indicates high technical debt regarding security hygiene, likely stemming from the transition of research-grade code into production environments without security review.</p>
+      </div>
+    </div>
+
+    <div class="analysis-block">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <span class="analysis-num">02</span>
+        <span class="analysis-label">Trend Analysis</span>
+        <span class="analysis-toggle">›</span>
+      </div>
+      <div class="analysis-body">
+        <p><strong>Shift from Traditional Web to Data-Centric Vulnerabilities:</strong> While traditional web vulnerabilities (SQLi, XSS) are largely absent, the dataset is dominated by flaws related to how data is ingested and processed — CWE-502 and CWE-20 together represent a new class of data-pipeline security failure specific to ML workflows.</p>
+        <p><strong>Integrity and Authenticity Gaps:</strong> CWE-353 and CWE-319 indicate that AI models and datasets are fetched over insecure channels (HTTP) or without cryptographic signature verification (SHA-256 checks), leaving every model download pipeline potentially compromised.</p>
+        <p><strong>Pythonic Research Debt:</strong> The high volume of Bandit findings reflects the "Notebook-to-Production" trend. Researchers prioritize speed, using <code>assert</code> for flow control and <code>eval</code> for quick experimentation, which persist in the codebase as it matures.</p>
+      </div>
+    </div>
+
+    <div class="analysis-block">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <span class="analysis-num">03</span>
+        <span class="analysis-label">Root Cause Analysis (AI/ML Context)</span>
+        <span class="analysis-toggle">›</span>
+      </div>
+      <div class="analysis-body">
+        <p><strong>Serialization Standards:</strong> Python's <code>pickle</code> and <code>PyYAML</code> (unsafe loader) are the default tools for saving ML models (<code>.pth</code>, <code>.pkl</code>, <code>.joblib</code>). These formats are inherently unsafe as they allow arbitrary code execution during the <code>load()</code> operation — by design.</p>
+        <p><strong>Model Distribution Workflows:</strong> AI/ML developers frequently automate model downloading using <code>requests</code> or <code>urllib</code> without enforcing TLS or validating hashes, leading to both CWE-319 and CWE-353 findings at scale.</p>
+        <p><strong>Dynamic Configuration Handling:</strong> To support diverse hyperparameters, many frameworks use <code>eval()</code> or <code>exec()</code> to parse command-line arguments or config files directly into Python objects, enabling CWE-95 at every entry point.</p>
+        <p><strong>Performance vs. Security:</strong> Input validation (CWE-20) is often skipped in data pipelines to avoid performance overhead when processing massive tensors or multi-gigabyte datasets — a trade-off that creates injection surfaces throughout the training loop.</p>
+      </div>
+    </div>
+
+    <div class="analysis-block">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <span class="analysis-num">04</span>
+        <span class="analysis-label">Security Risks in Production AI Systems</span>
+        <span class="analysis-toggle">›</span>
+      </div>
+      <div class="analysis-body">
+        <p><strong>Model Poisoning via RCE:</strong> An attacker can replace a legitimate model file on a public hub with a malicious pickle file. When a production system deserializes this model (CWE-502), the attacker gains Remote Code Execution on the GPU cluster — with no further exploitation needed.</p>
+        <p><strong>Supply Chain Compromise:</strong> Cleartext transmission (CWE-319) and lack of integrity checks (CWE-353) enable Man-in-the-Middle attacks where model weights are tampered with to introduce backdoors or training-time bias without the user's knowledge.</p>
+        <p><strong>Prompt Injection to OS Command Injection:</strong> In LLM-based applications, improper neutralization of directives (CWE-95, CWE-78) can allow end-users to bypass safety layers and execute shell commands on the underlying host by chaining prompt and command injection.</p>
+        <p><strong>Inference Environment Escape:</strong> Use of incorrectly resolved names (CWE-706) or insecure URL schemes (CWE-939) can be leveraged to access internal metadata services (e.g. AWS IMDSv2) from within a containerized inference engine.</p>
+      </div>
+    </div>
+
+    <div class="analysis-block">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <span class="analysis-num">05</span>
+        <span class="analysis-label">Mitigation Strategies</span>
+        <span class="analysis-toggle">›</span>
+      </div>
+      <div class="analysis-body">
+        <p><strong>Adopt Secure Serialization:</strong> Transition from <code>pickle</code> and <code>torch.save</code> to <strong>Safetensors</strong> — a zero-copy, restricted format that does not allow code execution and loads significantly faster for large models.</p>
+        <p><strong>Hardened Configuration Parsing:</strong> Replace <code>eval()</code> or <code>yaml.unsafe_load()</code> with <code>json.loads()</code>, <code>yaml.safe_load()</code>, or pydantic-based schema validation to eliminate CWE-95 at source.</p>
+        <p><strong>Strict Integrity Enforcement:</strong> Implement mandatory SHA-256 checksum verification for all downloaded model weights and datasets. Restrict all model fetching to HTTPS/TLS 1.3 with certificate pinning in production environments.</p>
+        <p><strong>Sandboxed Inference:</strong> Isolate model inference processes using gVisor or Firecracker microVMs to contain the blast radius of an RCE resulting from an unpatched CWE-502 or CWE-78 vulnerability in a deployed model server.</p>
+        <p><strong>SAST Integration with Custom Rulesets:</strong> Configure Semgrep specifically for AI libraries — checking for <code>weights_only=False</code> in PyTorch, unsafe YAML loaders, and subprocess misuse — to surface findings Bandit's generic rules cannot catch.</p>
+      </div>
+    </div>
+
+    <div class="analysis-block">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <span class="analysis-num">06</span>
+        <span class="analysis-label">Developer Awareness Checklist</span>
+        <span class="analysis-toggle">›</span>
+      </div>
+      <div class="analysis-body">
+        <div class="checklist">
+          <div class="check-item">
+            <div class="check-box" onclick="toggleCheck(this)"></div>
+            <span class="check-label"><strong>No Pickles:</strong> Have I replaced <code>pickle</code>, <code>joblib</code>, and <code>torch.load</code> (without <code>weights_only=True</code>) with Safetensors?</span>
+          </div>
+          <div class="check-item">
+            <div class="check-box" onclick="toggleCheck(this)"></div>
+            <span class="check-label"><strong>Safe YAML:</strong> Am I using <code>yaml.safe_load()</code> instead of <code>yaml.load()</code> everywhere in my codebase?</span>
+          </div>
+          <div class="check-item">
+            <div class="check-box" onclick="toggleCheck(this)"></div>
+            <span class="check-label"><strong>Validated Downloads:</strong> Does my model-loading script verify the SHA-256 file hash after downloading and before loading?</span>
+          </div>
+          <div class="check-item">
+            <div class="check-box" onclick="toggleCheck(this)"></div>
+            <span class="check-label"><strong>No Eval:</strong> Have I removed all instances of <code>eval()</code>, <code>exec()</code>, and <code>getattr()</code> on user-controlled or externally sourced input?</span>
+          </div>
+          <div class="check-item">
+            <div class="check-box" onclick="toggleCheck(this)"></div>
+            <span class="check-label"><strong>Environment Hardening:</strong> Are API keys and sensitive URIs handled via environment variables rather than hardcoded strings?</span>
+          </div>
+          <div class="check-item">
+            <div class="check-box" onclick="toggleCheck(this)"></div>
+            <span class="check-label"><strong>Subprocess Security:</strong> If using <code>subprocess</code>, am I using <code>shell=False</code> and passing arguments as a list rather than a string?</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="analysis-block">
+      <div class="analysis-header" onclick="toggleSection(this)">
+        <span class="analysis-num">07</span>
+        <span class="analysis-label">Final Conclusion</span>
+        <span class="analysis-toggle">›</span>
+      </div>
+      <div class="analysis-body">
+        <p>The AI/ML ecosystem is currently in a state of <strong>"Security Lag."</strong> While the sheer volume of findings is skewed by low-severity Python linting issues, the concentrated presence of <strong>CWE-502 (Deserialization)</strong> and <strong>CWE-95 (Eval Injection)</strong> constitutes a critical risk that static analysis alone cannot remediate.</p>
+        <p>The primary vulnerability vector is not the AI logic itself, but the <strong>untrusted ingestion of model data.</strong> As AI systems move from isolated research environments to core production infrastructure, the industry must move away from insecure legacy Python serialization formats toward cryptographically verified, data-only formats like Safetensors.</p>
+        <p>Failure to address the ~1,909 HIGH severity findings identified in this dataset leaves these repositories highly susceptible to automated supply-chain attacks. With AI models now embedded in medical devices, autonomous vehicles, and financial systems, these are no longer academic concerns — they are operational risk.</p>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // ── COUNTER ANIMATION ──
+  function animateCount(id, target, duration) {
+    const el = document.getElementById(id);
+    const start = performance.now();
+    const fmt = v => v >= 1000 ? v.toLocaleString() : String(Math.round(v));
+    function update(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      el.textContent = fmt(Math.round(target * ease));
+      if (t < 1) requestAnimationFrame(update);
+      else el.textContent = fmt(target);
+    }
+    requestAnimationFrame(update);
+  }
+  animateCount('cnt-repos', 2439, 1800);
+  animateCount('cnt-findings', 169302, 2200);
+
+  // ── SEVERITY BAR ANIMATION ──
+  setTimeout(() => {
+    document.querySelectorAll('.sev-fill').forEach(el => {
+      el.style.width = el.dataset.w + '%';
+    });
+  }, 300);
+
+  // ── ACCORDION ──
+  function toggleSection(header) {
+    const body = header.nextElementSibling;
+    const toggle = header.querySelector('.analysis-toggle');
+    const isOpen = body.classList.contains('open');
+    body.classList.toggle('open', !isOpen);
+    toggle.classList.toggle('open', !isOpen);
+  }
+
+  // ── CHECKLIST ──
+  function toggleCheck(box) {
+    box.classList.toggle('checked');
+  }
+
+  // ── CHART THEME ──
+  const gridColor = 'rgba(255,255,255,0.05)';
+  const tickColor = '#7a8fa8';
+
+  // ── TOOL DONUT ──
+  new Chart(document.getElementById('toolChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Bandit', 'Semgrep'],
+      datasets: [{
+        data: [139840, 29462],
+        backgroundColor: ['#ff4d6d', '#4af0b6'],
+        borderColor: '#0f1319',
+        borderWidth: 3,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '72%',
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#1a2230',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#e8edf5',
+        bodyColor: '#7a8fa8',
+        titleFont: { family: 'JetBrains Mono', size: 11 },
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+        callbacks: { label: ctx => ' ' + ctx.label + ': ' + ctx.parsed.toLocaleString() }
+      }}
+    }
+  });
+
+  // ── SEVERITY DONUT ──
+  new Chart(document.getElementById('sevChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['LOW', 'WARNING', 'MEDIUM', 'ERROR', 'HIGH', 'INFO'],
+      datasets: [{
+        data: [124842, 21953, 13169, 7344, 1909, 115],
+        backgroundColor: ['#52d68a', '#ffc94a', '#6c8fff', '#ff9f56', '#ff4d6d', '#4a5568'],
+        borderColor: '#0f1319',
+        borderWidth: 2,
+        hoverOffset: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#1a2230',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#e8edf5',
+        bodyColor: '#7a8fa8',
+        titleFont: { family: 'JetBrains Mono', size: 11 },
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+      }}
+    }
+  });
+
+  // ── CWE HORIZONTAL BAR ──
+  new Chart(document.getElementById('cweChart'), {
+    type: 'bar',
+    data: {
+      labels: ['CWE-502', 'CWE-676', 'CWE-319', 'CWE-353', 'CWE-95', 'CWE-20', 'CWE-706', 'CWE-78', 'CWE-939', 'CWE-96'],
+      datasets: [{
+        label: 'Occurrences',
+        data: [12222, 2703, 2566, 1950, 1632, 730, 676, 419, 270, 232],
+        backgroundColor: ['#ff4d6d','#ff6b52','#ff8f52','#ffc94a','#6c8fff','#6c8fff','#3dd8ff','#3dd8ff','#4af0b6','#4af0b6'],
+        borderRadius: 4,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#1a2230',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#e8edf5',
+        bodyColor: '#7a8fa8',
+        titleFont: { family: 'JetBrains Mono', size: 11 },
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+        callbacks: { label: ctx => '  ' + ctx.parsed.x.toLocaleString() + ' occurrences' }
+      }},
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor, font: { family: 'JetBrains Mono', size: 10 }, callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }, border: { color: 'transparent' } },
+        y: { grid: { display: false }, ticks: { color: '#4af0b6', font: { family: 'JetBrains Mono', size: 11 } }, border: { color: 'transparent' } }
+      }
+    }
+  });
+
+  // ── ACTIONABLE BAR ──
+  new Chart(document.getElementById('actionChart'), {
+    type: 'bar',
+    data: {
+      labels: ['WARNING', 'MEDIUM', 'ERROR', 'HIGH'],
+      datasets: [{
+        label: 'Findings',
+        data: [21953, 13169, 7344, 1909],
+        backgroundColor: ['#ffc94a', '#6c8fff', '#ff9f56', '#ff4d6d'],
+        borderRadius: 6,
+        borderSkipped: false
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#1a2230',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#e8edf5',
+        bodyColor: '#7a8fa8',
+        titleFont: { family: 'JetBrains Mono', size: 11 },
+        bodyFont: { family: 'JetBrains Mono', size: 11 },
+        callbacks: { label: ctx => '  ' + ctx.parsed.y.toLocaleString() + ' findings' }
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { color: tickColor, font: { family: 'JetBrains Mono', size: 11 } }, border: { color: 'transparent' } },
+        y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { family: 'JetBrains Mono', size: 10 }, callback: v => v >= 1000 ? (v/1000).toFixed(0) + 'k' : v }, border: { color: 'transparent' } }
+      }
+    }
+  });
+</script>
+</body>
+</html>
